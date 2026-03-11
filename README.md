@@ -172,7 +172,7 @@ Image behavior:
 - Updates **6 times per second** in normal mode
 - Includes timestamp overlay
 - Rotating **A–F letters** to show frame changes
-- In `frame_drop` mode, image rate temporarily drops to about **1–2 FPS** before returning to normal
+- In `frame_drop` mode, image rate temporarily drops to about **0–2 FPS** before returning to normal
 
 ---
 
@@ -190,7 +190,7 @@ Available modes:
 |----|----|
 | `normal` | Default randomized simulation |
 | `missing_live_data` | `/api/live1sec` skips a few seconds of visible updates while `/api/history1sec` still records them |
-| `frame_drop` | Image stream temporarily drops to about 1–2 FPS, then returns to 6 FPS |
+| `frame_drop` | Image stream temporarily drops to about 0–2 FPS, then returns to 6 FPS |
 | `mixed_dqi` | Good and bad `dqi` values are mixed together in the telemetry stream |
 
 PowerShell example:
