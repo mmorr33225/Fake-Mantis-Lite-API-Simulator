@@ -118,6 +118,7 @@ Notes:
 - Data updates **once per second**
 - Multiple requests within the same second return the same sample
 - Timestamps are always **UTC**
+- In `missing_live_data` mode, `/api/live1sec` may appear frozen for a few seconds while history continues recording normally
 
 ---
 
@@ -148,6 +149,7 @@ Notes:
 - Simulator seeds **15 minutes of history at startup**
 - New points added every second
 - Up to **24 hours of history stored**
+- In `missing_live_data` mode, history still stores every 1-second point even when `/api/live1sec` temporarily stops updating
 
 ---
 
@@ -167,9 +169,10 @@ curl http://127.0.0.1:8477/api/image/latest.jpg --output frame.jpg
 
 Image behavior:
 
-- Updates **6 times per second**
+- Updates **6 times per second** in normal mode
 - Includes timestamp overlay
 - Rotating **A–F letters** to show frame changes
+- In `frame_drop` mode, image rate temporarily drops to about **1–2 FPS** before returning to normal
 
 ---
 
@@ -186,10 +189,9 @@ Available modes:
 | Mode | Description |
 |----|----|
 | `normal` | Default randomized simulation |
-| `empty` | No flame detected |
-| `bad_dqi` | Data quality failure |
-| `high_flame` | Extreme flame conditions |
-| `sensor_error` | Sensor malfunction |
+| `missing_live_data` | `/api/live1sec` skips a few seconds of visible updates while `/api/history1sec` still records them |
+| `frame_drop` | Image stream temporarily drops to about 1–2 FPS, then returns to 6 FPS |
+| `mixed_dqi` | Good and bad `dqi` values are mixed together in the telemetry stream |
 
 PowerShell example:
 
@@ -197,7 +199,7 @@ PowerShell example:
 Invoke-RestMethod -Method Post `
   -Uri "http://127.0.0.1:8477/api/simulate" `
   -ContentType "application/json" `
-  -Body '{"mode":"empty"}'
+  -Body '{"mode":"missing_live_data"}'
 ```
 
 curl example:
@@ -205,7 +207,7 @@ curl example:
 ```bash
 curl.exe -X POST http://127.0.0.1:8477/api/simulate \
  -H "Content-Type: application/json" \
- -d "{\"mode\":\"empty\"}"
+ -d "{\"mode\":\"missing_live_data\"}"
 ```
 
 Return to normal simulation:
@@ -215,6 +217,12 @@ curl.exe -X POST http://127.0.0.1:8477/api/simulate \
  -H "Content-Type: application/json" \
  -d "{\"mode\":\"normal\"}"
 ```
+
+Mode notes:
+
+- `missing_live_data` is useful for testing **backfill logic**
+- `frame_drop` is useful for testing **image timeout or reconnect logic**
+- `mixed_dqi` is useful for testing **DQI filtering logic**
 
 ---
 
@@ -239,7 +247,8 @@ Example response:
   "mode": "normal",
   "latestTs": "2026-03-11T16:02:41Z",
   "historyPoints": 902,
-  "imageRateHz": 6
+  "imageRateHz": 6,
+  "liveSuppressed": false
 }
 ```
 
@@ -249,6 +258,7 @@ This endpoint helps confirm:
 - timestamps are updating
 - history is accumulating
 - current simulation mode
+- whether live updates are currently being suppressed in `missing_live_data` mode
 
 ---
 
@@ -256,7 +266,7 @@ This endpoint helps confirm:
 
 - All timestamps are **UTC**
 - Telemetry updates **1 Hz**
-- Images update **6 Hz**
+- Images update **6 Hz** in normal mode
 
 ---
 
