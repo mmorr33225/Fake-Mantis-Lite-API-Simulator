@@ -1,4 +1,4 @@
-# Fake Mantis Lite API Simulator
+# Mantis Lite API Simulator
 
 This project provides a **simulated Mantis Lite API** for developers to test integrations **without needing the camera or production system**.
 
