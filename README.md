@@ -13,6 +13,7 @@ The simulator generates realistic telemetry data and images so client software c
 - Simulated **camera image stream (6 FPS)**
 - **Simulation modes** for testing edge cases
 - **Status endpoint** for debugging
+- Pre-seeded history buffer
 
 ---
 
@@ -88,28 +89,30 @@ Example response:
 
 ```json
 {
-  "ts": "2026-03-11T15:45:33.3343151Z",
-  "empty": false,
-  "dqi": 1,
-  "cubes": 4,
-  "nhvDil": 936.4,
-  "nhvCz": 1002.1,
-  "si": 0.81,
-  "ci": 1.09,
-  "vis": false,
-  "ff": 12.4,
-  "hr": 0.055,
-  "pilot": true,
-  "dre": 98.7,
-  "maxT1": 745.6,
-  "maxT2": 751.2,
-  "fr": 719,
-  "sensorT": 27.8,
-  "flamePx": 804,
-  "edgePx": 153,
-  "fs": 92,
-  "intTime": 300,
-  "cubePct": 67
+  "DateTime": "03/26/2026 01:46:27 PM",
+  "NHVcz": 995.3,
+  "NHVdil": 925.6,
+  "DRE": 97.7,
+  "SI": 0.82,
+  "FF": 13.3,
+  "FH": 0.059,
+  "Flame_Stability": 94,
+  "Distance": 210,
+  "Ambient_Temp": 20,
+  "RH": 70,
+  "Flare_Type": 2,
+  "Frame_Rate": 719,
+  "SN_Ratio": 0.814,
+  "DQI_Flag": 1,
+  "Sensor_Temp": 26.5,
+  "Data_Cubes": 1,
+  "Edge_Pixels": 154,
+  "Flame_Pixels": 760,
+  "Apparent_Temp": 1005.4,
+  "Visible_Emissions": 0,
+  "Pilot_Status": 1,
+  "UTC": "2026-03-26 17:46:27",
+  "LocationName": "LOCATION 1"
 }
 ```
 
@@ -117,8 +120,9 @@ Notes:
 
 - Data updates **once per second**
 - Multiple requests within the same second return the same sample
-- Timestamps are always **UTC**
-- In `missing_live_data` mode, `/api/live1sec` may appear frozen for a few seconds while history continues recording normally
+- `DateTime` is a formatted local timestamp
+- `UTC` is provided as a UTC reference timestamp
+- In `missing_live_data` mode, `/api/live1sec` may appear frozen temporarily
 
 ---
 
@@ -136,20 +140,68 @@ Parameters
 |---|---|
 | `from` | Start timestamp (UTC) |
 | `to` | End timestamp (UTC) |
-| `dqiOnly` | Optional filter (1 = return only rows where `dqi == 1`) |
+| `dqiOnly` | Optional filter (1 = return only rows where `DQI_Flag == 1`) |
 
 Example request:
 
 ```bash
-curl "http://127.0.0.1:8477/api/history1sec?from=2026-03-11T15:44:00Z&to=2026-03-11T15:46:00Z"
+curl "http://127.0.0.1:8477/api/history1sec?from=2026-03-26T17:44:00Z&to=2026-03-26T17:46:00Z"
+```
+
+Example request with filtering:
+
+```bash
+curl "http://127.0.0.1:8477/api/history1sec?from=2026-03-26T17:44:00Z&to=2026-03-26T17:46:00Z&dqiOnly=1"
+```
+
+Example response:
+
+```json
+{
+  "from": "2026-03-26T17:44:00Z",
+  "to": "2026-03-26T17:46:00Z",
+  "dqiOnly": 0,
+  "count": 121,
+  "points": [
+    {
+      "DateTime": "03/26/2026 01:44:00 PM",
+      "NHVcz": 1001.5,
+      "NHVdil": 932.8,
+      "DRE": 98.1,
+      "SI": 0.79,
+      "FF": 12.7,
+      "FH": 0.056,
+      "Flame_Stability": 91,
+      "Distance": 210,
+      "Ambient_Temp": 20,
+      "RH": 70,
+      "Flare_Type": 2,
+      "Frame_Rate": 719,
+      "SN_Ratio": 0.812,
+      "DQI_Flag": 1,
+      "Sensor_Temp": 27.1,
+      "Data_Cubes": 3,
+      "Edge_Pixels": 151,
+      "Flame_Pixels": 784,
+      "Apparent_Temp": 1016.3,
+      "Visible_Emissions": 0,
+      "Pilot_Status": 1,
+      "UTC": "2026-03-26 17:44:00",
+      "LocationName": "LOCATION 1"
+    }
+  ]
+}
 ```
 
 Notes:
 
-- Simulator seeds **15 minutes of history at startup**
-- New points added every second
-- Up to **24 hours of history stored**
-- In `missing_live_data` mode, history still stores every 1-second point even when `/api/live1sec` temporarily stops updating
+- Simulator seeds **~15 minutes of history on startup**
+- New data is added every second
+- Stores up to **24 hours of data**
+- In `missing_live_data` mode, `/api/live1sec` may appear frozen for a few seconds while history continues recording normally
+- All query parameters (`from`, `to`) must be provided in **UTC**
+- The `UTC` field in responses is the authoritative timestamp
+- `DateTime` is a formatted local display value and should not be used for calculations
 
 ---
 
@@ -170,9 +222,10 @@ curl http://127.0.0.1:8477/api/image/latest.jpg --output frame.jpg
 Image behavior:
 
 - Updates **6 times per second** in normal mode
-- Includes timestamp overlay
 - Rotating **A–F letters** to show frame changes
-- In `frame_drop` mode, image rate temporarily drops to about **0–2 FPS** before returning to normal
+- Includes timestamp overlay
+- Rotating **A–F letters**
+- In `frame_drop` mode, updates may drop to **0–2 FPS**
 
 ---
 
@@ -205,21 +258,15 @@ Invoke-RestMethod -Method Post `
 curl example:
 
 ```bash
-curl.exe -X POST http://127.0.0.1:8477/api/simulate \
- -H "Content-Type: application/json" \
- -d "{\"mode\":\"missing_live_data\"}"
+curl.exe -X POST http://127.0.0.1:8477/api/simulate  -H "Content-Type: application/json"  -d "{"mode":"missing_live_data"}"
 ```
 
-Return to normal simulation:
+Return to normal:
 
 ```bash
-curl.exe -X POST http://127.0.0.1:8477/api/simulate \
- -H "Content-Type: application/json" \
- -d "{\"mode\":\"normal\"}"
+curl.exe -X POST http://127.0.0.1:8477/api/simulate  -H "Content-Type: application/json"  -d "{"mode":"normal"}"
 ```
-
 Mode notes:
-
 - `missing_live_data` is useful for testing **backfill logic**
 - `frame_drop` is useful for testing **image timeout or reconnect logic**
 - `mixed_dqi` is useful for testing **DQI filtering logic**
@@ -228,7 +275,7 @@ Mode notes:
 
 # Status Endpoint
 
-Returns debugging information about the simulator.
+Returns debugging information.
 
 ```
 GET /api/status
@@ -245,28 +292,56 @@ Example response:
 ```json
 {
   "mode": "normal",
-  "latestTs": "2026-03-11T16:02:41Z",
+  "latestTs": "2026-03-26 17:46:27",
   "historyPoints": 902,
   "imageRateHz": 6,
   "liveSuppressed": false
 }
 ```
-
 This endpoint helps confirm:
-
 - simulator is running
 - timestamps are updating
 - history is accumulating
 - current simulation mode
 - whether live updates are currently being suppressed in `missing_live_data` mode
+---
+# Data Shape Reference
+
+| Field | Type | Description |
+|---|---|---|
+| DateTime | string | Local Formatted Timestamp (Display Only) |
+| NHVcz | number | Combustion-Zone Heating Value |
+| NHVdil | number | Dilution Heating Value |
+| DRE | number | Destruction and Removal Efficiency |
+| SI | number | Smoke Index |
+| FF | number | Flame Footprint |
+| FH | number | Fractional Heat Release |
+| Flame_Stability | integer | Flame Stability |
+| Distance | number | Distance from the Camera to the Flame (User Input) |
+| Ambient_Temp | number | Ambient Temperature (User Input and Defaulted to 20 on Permanent Installs) |
+| RH | number | Relative Humidity (User Input and Defaulted to 70 on Permanent Installs) |
+| Flare_Type | integer | Value Representing Type of Flare (0 = Unassisted, 1 = Air Assisted, 2 = Steam Assisted, 3 = Pressure Assisted) |
+| Frame_Rate | integer | Frame Rate of Sensor (700-720 Expected)|
+| SN_Ratio | number | Signal to Noise Ratio |
+| DQI_Flag | integer | Internal Data Quality Indicator (1 = Valid, 0 = Invalid) |
+| Sensor_Temp | number | Internal Temp of Sensor |
+| Data_Cubes | integer | Number of Data Cubes in the 1 Sec Window (0-6 Expected) |
+| Edge_Pixels | integer | Number of Pixels Touching the Edge |
+| Flame_Pixels | integer | Number of Flame Pixels |
+| Apparent_Temp | number | Apparent Temperature |
+| Visible_Emissions | integer | Visible Emissions Indicator (1 = On, 0 = Off) |
+| Pilot_Status | integer | Pilot Status Indicator (1 = On, 0 = Off) |
+| UTC | string | UTC Timestamp (Authoritative Time Reference) |
+| LocationName | string | User Input Text Field |
 
 ---
 
 # Notes
 
-- All timestamps are **UTC**
-- Telemetry updates **1 Hz**
-- Images update **6 Hz** in normal mode
+- Telemetry updates at **1 Hz**
+- Images update up to **6 Hz**
+- History stored in memory only
+- Designed for **integration testing without hardware**
 
 ---
 
